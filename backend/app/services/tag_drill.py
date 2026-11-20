@@ -18,8 +18,8 @@ def drill_tag(config_id: str) -> dict[str, Any]:
     drill_dimensions = config.get("drill_dimensions", [])
     stat_method = config["stat_method"]
 
-    # 获取标签计算结果
-    tag_results = store.list_artifacts("tag_compute")
+    # 获取第 2 版标签结果批次
+    tag_results = store.list_artifacts("tag_result_v2")
 
     # 汇总数据
     drill_data: dict[str, list[dict[str, Any]]] = defaultdict(list)

@@ -88,6 +88,9 @@ class TagComputeEntry(BaseModel):
     parallelism: int = Field(1, description="并行度")
     exec_state: str = Field(..., description="执行状态")
     result_count: int = Field(0, description="计算结果条数")
+    result_version: int = Field(1, description="当前发布的结果数据版本")
+    result_batch_id: str = Field("", description="最新第 2 版结果批次编号")
+    legacy_output_coverage: str = Field("", description="升级前旧结果的会员覆盖方式：explicit/hit_only")
     error_log: str = Field("", description="错误日志")
 
 
@@ -388,7 +391,7 @@ class AggResult(BaseModel):
 
 
 class TagComputeResult(BaseModel):
-    """标签计算结果产物。"""
+    """标签计算结果产物（第 1 版，布尔明细，保留给旧活动回放）。"""
 
     task_id: str
     tag_id: str
@@ -397,6 +400,42 @@ class TagComputeResult(BaseModel):
     user_tag_values: list[dict[str, Any]] = Field(default_factory=list)
     output_partition: str = ""
     compute_time_ms: int = 0
+
+
+class TagValueRecord(BaseModel):
+    """第 2 版标签值：每条记录都显式区分已计算/未命中，不再靠缺行推断。"""
+
+    user_id: str = Field(..., description="会员编号")
+    tag_id: str = Field(..., description="标签编号")
+    tag_value: Any = Field(None, description="标签值；未命中时为 None，未计算时不落该用户")
+    hit: bool = Field(..., description="是否命中规则")
+    computed: bool = Field(True, description="该会员是否参与本次计算")
+    value_type: str = Field(..., description="标签值类型：bool/int/float/string/none")
+    task_id: str = Field(..., description="产出该值的计算任务编号")
+    coverage: str = Field(..., description="会员覆盖来源：explicit 全体名单 / hit_only 仅命中者")
+
+
+class TagResultBatchV2(BaseModel):
+    """第 2 版标签结果批次：一次计算对应一份可追溯的版本化结果。"""
+
+    batch_id: str = Field(..., description="批次编号")
+    result_version: int = Field(2, description="结果数据版本，固定为 2")
+    task_id: str = Field(..., description="关联计算任务编号")
+    tag_id: str = Field(..., description="关联标签编号")
+    compute_scope: str = Field(..., description="计算范围")
+    value_type: str = Field(..., description="本批次实际值类型：bool/int/float/string")
+    coverage: str = Field(..., description="会员覆盖方式：explicit/hit_only")
+    source_version: int = Field(2, description="来源数据版本：2 为原生，1 为兼容迁移")
+    migrated_from: str | None = Field(None, description="兼容迁移前的结果版本标记")
+    output_partition: str = Field("", description="输出分区")
+    member_count: int = Field(0, description="批次涉及的会员总数")
+    hit_count: int = Field(0, description="命中会员数")
+    miss_count: int = Field(0, description="未命中会员数")
+    miss_covered: bool = Field(False, description="是否覆盖未命中集合；仅命中批次为 False")
+    undetermined_count: int = Field(0, description="因依赖标签未知而未参与计算的会员数")
+    records: list[TagValueRecord] = Field(default_factory=list, description="逐会员标签值")
+    sequence: int = Field(0, description="写入序号，用于判断最新批次")
+    compute_time_ms: int = Field(0, description="计算耗时（毫秒）")
 
 
 class SegmentResult(BaseModel):

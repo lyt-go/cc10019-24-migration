@@ -8,8 +8,46 @@
       <div class="page-actions">
         <button class="btn primary" data-testid="open-create" type="button" @click="openCreate">登记圈选条件</button>
         <button class="btn" data-testid="export" type="button" @click="exportRows">导出人群圈选清单</button>
+        <button class="btn" data-testid="compare-versions" type="button" :disabled="comparing" @click="compareVersions">
+          {{ comparing ? '核对中…' : '核对新旧名单' }}
+        </button>
       </div>
     </header>
+
+    <div v-if="compare" class="compare-panel" data-testid="version-compare">
+      <h3>新旧名单核对 · {{ compare.condition_id }}</h3>
+      <table class="data-table">
+        <thead>
+          <tr><th>口径</th><th>结果版本</th><th>值类型</th><th>命中人数</th><th>覆盖会员</th><th>任务批次</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="side in compareRows" :key="side.label" :data-testid="`compare-${side.key}`">
+            <td>{{ side.label }}</td>
+            <td>v{{ side.row.result_version }}</td>
+            <td>{{ side.row.value_type }}</td>
+            <td>{{ side.row.matched_count }}</td>
+            <td>{{ side.row.member_count }}</td>
+            <td>{{ side.batches }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p data-testid="compare-diff">
+        仅旧名单：{{ compare.only_in_v1.length }} 人；仅新名单：{{ compare.only_in_v2.length }} 人；
+        名单{{ compare.same_users ? '一致' : '不一致' }}。
+      </p>
+      <p v-if="!compare.version_consistency.v2_all_v2 || !compare.version_consistency.v1_all_v1" class="error-text" data-testid="compare-mixed">
+        同一次圈选混用了两个结果版本，请检查批次锁定。
+      </p>
+      <p
+        v-for="check in compare.hit_only_checks"
+        :key="check.batch_id"
+        :class="check.ok ? '' : 'error-text'"
+        :data-testid="`hit-only-${check.batch_id}`"
+      >
+        批次 {{ check.batch_id }}（{{ check.coverage }}）：未命中 {{ check.miss_count }} 条，
+        {{ check.ok ? '没有凭空出现未命中记录' : '出现了不该存在的未命中记录' }}
+      </p>
+    </div>
 
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
@@ -100,6 +138,37 @@ const filterFields = columns.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const comparing = ref(false)
+const compare = ref<any>(null)
+const compareRows = computed(() => {
+  if (!compare.value) return []
+  return [
+    { key: 'v1', label: '旧名单回放', row: compare.value.v1, batches: batchSummary(compare.value.v1) },
+    { key: 'v2', label: '新版圈选', row: compare.value.v2, batches: batchSummary(compare.value.v2) },
+  ]
+})
+function batchSummary(row: any) {
+  return Object.entries(row.batches ?? {})
+    .map(([tag, batch]: [string, any]) => `${tag}:${batch.batch_id ?? `seq-${batch.sequence}`}`)
+    .join('，')
+}
+async function compareVersions() {
+  const row = rows.value[0]
+  if (!row) return
+  comparing.value = true
+  errorMessage.value = ''
+  try {
+    const conditionId = String(row.condition_id ?? row['条件编号'] ?? '')
+    const response = await request(`${ENDPOINT}/${conditionId}/compare`)
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.detail || '新旧名单核对失败')
+    compare.value = payload
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '新旧名单核对失败'
+  } finally {
+    comparing.value = false
+  }
+}
 const stats = computed(() => [
   { label: metricNames[0], value: total.value },
   { label: metricNames[1], value: rows.value.filter((row) => row.status === statuses[1]).length },

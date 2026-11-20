@@ -20,6 +20,20 @@ class Store:
         self._snapshots: dict[str, list[dict[str, Any]]] = {}
         # 计算结果缓存
         self._compute_cache: dict[str, dict[str, Any]] = {}
+        # 运行期开关与迁移日志（不随数据产物清理而丢失）
+        self._runtime: dict[str, Any] = {
+            # 兼容上线开关：v2 表示人群圈选默认读取第 2 版结果。
+            "tag_result_switch": "v2",
+            "tag_result_migration": {
+                "state": "pending",
+                "total": 0,
+                "completed": [],
+                "issues": [],
+                "attempts": 0,
+            },
+            # 批次写入序号，用于稳定判断“最新批次”。
+            "tag_result_sequence": 0,
+        }
         # 下一个自增ID
         self._next_ids: dict[str, int] = {
             name: max((int(row.get("id", 0)) for row in self._tables[name]), default=0) + 1
@@ -137,6 +151,16 @@ class Store:
         keys_to_remove = [k for k in self._compute_cache if k.startswith(prefix)]
         for k in keys_to_remove:
             del self._compute_cache[k]
+
+    # ========== 运行期开关与迁移日志 ==========
+    def runtime(self) -> dict[str, Any]:
+        """获取运行期开关容器（迁移状态、结果版本开关、批次序号）。"""
+        return self._runtime
+
+    def next_sequence(self) -> int:
+        """分配一个单调递增的批次序号。"""
+        self._runtime["tag_result_sequence"] += 1
+        return self._runtime["tag_result_sequence"]
 
     # ========== 跨模块关联查询 ==========
     def join(self, left_module: str, right_module: str, left_field: str, right_field: str) -> list[dict[str, Any]]:

@@ -16,13 +16,13 @@ def create_snapshot(snapshot_id: str) -> dict[str, Any]:
     tags = store.rows("tag_define")
     # 获取所有分群
     segments = store.rows("user_segment")
-    # 获取标签计算结果
-    compute_results = store.list_artifacts("tag_compute")
+    # 获取第 2 版标签结果批次
+    compute_results = store.list_artifacts("tag_result_v2")
 
-    # 计算用户基数（从标签计算结果汇总）
+    # 计算用户基数（从标签结果批次的会员覆盖汇总）
     total_users = 0
     for result in compute_results:
-        total_users = max(total_users, result.get("result_count", 0))
+        total_users = max(total_users, result.get("member_count", 0))
     if total_users == 0:
         total_users = 50000  # 默认值
 
@@ -37,10 +37,16 @@ def create_snapshot(snapshot_id: str) -> dict[str, Any]:
         "segments": [{"segment_id": s["segment_id"], "segment_name": s["segment_name"]} for s in segments],
         "compute_results": [
             {
+                "batch_id": r.get("batch_id"),
                 "task_id": r.get("task_id"),
                 "tag_id": r.get("tag_id"),
-                "result_count": r.get("result_count"),
-                "compute_scope": r.get("compute_scope"),
+                "result_version": r.get("result_version"),
+                "source_version": r.get("source_version"),
+                "value_type": r.get("value_type"),
+                "coverage": r.get("coverage"),
+                "member_count": r.get("member_count"),
+                "hit_count": r.get("hit_count"),
+                "miss_count": r.get("miss_count"),
             }
             for r in compute_results
         ],

@@ -68,6 +68,57 @@ npm run dev
 | 标签快照 | `tag_snapshot` | 快照记录 | 快照编号、快照日期、用户基数 |
 | 行为热力 | `behavior_heatmap` | 热力配置 | 配置编号、行为事件、时间范围 |
 
+## 标签结果数据（第 2 版）
+
+标签计算结果有两套版本，**同一个条件只能用一个版本解释**：
+
+| 版本 | 产物类型 | 语义 |
+| --- | --- | --- |
+| 第 1 版 | `tag_compute`（`result_version=1`） | 布尔明细，靠“有没有这一行”表达命中，只用于旧活动名单回放 |
+| 第 2 版 | `tag_result_v2` | 每个会员一条记录，`computed` / `hit` / `tag_value` 把“未计算 / 未命中 / 已计算”拆开 |
+
+第 2 版批次头部字段：
+
+- `value_type`：该批次实际的值类型（`bool` / `int` / `float` / `string`），圈选按它比较字段语义；
+- `coverage`：`explicit` 记录了本次计算的全体会员、`hit_only` 只留命中者、`unknown` 覆盖方式未知；
+- `miss_covered`：是否拥有可靠的未命中集合。`hit_only` / `unknown` 一律为 `false`；
+- `source_version`：`2` 为原生第 2 版，`1` 为兼容迁移而来，`migrated_from` 记录来源版本；
+- `migration_issues`：迁移时无法判定的会员（值缺失、`unknown`、意外未命中行等）。
+
+兼容迁移只转换旧结果真正记录过的信息：`explicit` 批次的非命中行迁为未命中；
+`hit_only` 批次只迁命中者，**未出现的会员保持未知，不会补成未命中**；
+旧行值缺失/`unknown` 只登记问题，不迁为未命中。仅命中批次上的否定条件（`NOT`、`eq false`）
+会判为“不可判定”，不给名单。
+
+### 兼容上线接口
+
+```bash
+# 1) 查看待迁移的旧结果
+curl http://127.0.0.1:8000/api/crowd-select/tag-results/migration
+
+# 2) 执行兼容迁移（interrupt_after 可在第 N 个批次后模拟中断）
+curl -X POST http://127.0.0.1:8000/api/crowd-select/tag-results/migrate
+curl -X POST 'http://127.0.0.1:8000/api/crowd-select/tag-results/migrate?interrupt_after=1'
+
+# 3) 切换圈选读取的结果版本（旧结果未迁完时切 v2 会返回 409）
+curl -X POST 'http://127.0.0.1:8000/api/crowd-select/tag-results/switch?version=v2'
+
+# 4) 新名单按第 2 版圈选；旧活动名单固定按第 1 版回放
+curl -X POST http://127.0.0.1:8000/api/crowd-select/CS-001/run
+curl -X POST http://127.0.0.1:8000/api/crowd-select/CS-001/replay
+
+# 5) 在验证环境同时跑新旧两版并核对名单 / 版本 / 覆盖语义
+curl http://127.0.0.1:8000/api/crowd-select/CS-001/compare
+```
+
+迁移按确定性批次编号 `TRB-<task_id>-V2` 写入：中断后重新进入会续跑，不会产生重复批次。
+`backend/scripts/verify_tag_v2.py` 把上述核对串成一条命令：
+
+```bash
+cd backend && .venv/bin/python scripts/verify_tag_v2.py --base http://127.0.0.1:8000
+```
+
+
 ## 约定
 
 - 每个模块的前端页面在 `frontend/src/views/<模块>/index.vue`，后端接口在

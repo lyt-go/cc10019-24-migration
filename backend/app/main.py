@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from app.config import settings
 from app.routers import ROUTERS
@@ -21,6 +23,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class UnderscoreModulePathMiddleware(BaseHTTPMiddleware):
+    """兼容历史路径：前端仍用 /api/tag_compute，后端路由是 /api/tag-compute。
+
+    只把第一段模块名里的下划线换成连字符，其余路径原样保留。
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope["path"]
+        if path.startswith("/api/"):
+            head, _, tail = path[len("/api/"):].partition("/")
+            normalized = head.replace("_", "-")
+            if normalized != head:
+                request.scope["path"] = f"/api/{normalized}" + (f"/{tail}" if tail else "")
+        return await call_next(request)
+
+
+app.add_middleware(UnderscoreModulePathMiddleware)
 
 for module in ROUTERS:
     app.include_router(module.router)

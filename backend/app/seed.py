@@ -91,6 +91,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "source_attrs": ["ATTR-002", "ATTR-003"],
             "update_cycle": "daily",
             "coverage_threshold": 0.8,
+            "value_type": "bool",
             "version": "v1.0",
         },
         {
@@ -105,6 +106,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "source_attrs": ["ATTR-002"],
             "update_cycle": "daily",
             "coverage_threshold": 0.95,
+            "value_type": "bool",
             "version": "v1.0",
         },
         {
@@ -119,6 +121,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "source_attrs": ["TAG-001", "ATTR-005"],
             "update_cycle": "hourly",
             "coverage_threshold": 0.7,
+            "value_type": "bool",
             "version": "v1.0",
         },
         {
@@ -133,6 +136,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "source_attrs": ["ATTR-002", "ATTR-003"],
             "update_cycle": "daily",
             "coverage_threshold": 0.6,
+            "value_type": "bool",
             "version": "v1.0",
         },
     ],
@@ -152,6 +156,8 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "parallelism": 4,
             "exec_state": "success",
             "result_count": 12500,
+            "result_version": 1,
+            "legacy_output_coverage": "explicit",
             "error_log": "",
         },
         {
@@ -168,6 +174,8 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
             "parallelism": 2,
             "exec_state": "success",
             "result_count": 3200,
+            "result_version": 1,
+            "legacy_output_coverage": "hit_only",
             "error_log": "",
         },
         {

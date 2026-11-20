@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
-from app.services.tag_compute import get_compute_result
+from app.services.tag_compute import get_compute_result_v2
 from app.services.user_segment import get_segment_result
 
 
@@ -17,19 +17,23 @@ def build_profile_card(card_id: str) -> dict[str, Any]:
     display_tags = card.get("display_tags", [])
     segment_id = card.get("segment_id", "")
 
-    # 获取标签计算结果
+    # 获取第 2 版标签结果
     tag_values: list[dict[str, Any]] = []
     for tag_id in display_tags:
         # 查找对应计算任务
         tasks = store.find_all_by_field("tag_compute", "tag_id", tag_id)
         for task in tasks:
-            result = get_compute_result(task["task_id"])
+            result = get_compute_result_v2(task["task_id"])
             if result:
                 tag_values.append({
                     "tag_id": tag_id,
                     "tag_name": _get_tag_name(tag_id),
-                    "result_count": result.get("result_count", 0),
-                    "compute_scope": result.get("compute_scope", ""),
+                    "batch_id": result.get("batch_id"),
+                    "result_version": result.get("result_version"),
+                    "value_type": result.get("value_type"),
+                    "coverage": result.get("coverage"),
+                    "member_count": result.get("member_count", 0),
+                    "hit_count": result.get("hit_count", 0),
                 })
 
     # 获取分群结果
